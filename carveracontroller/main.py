@@ -159,6 +159,7 @@ from carveracontroller.addons.pendant import (
     SettingPendantSelector,
 )
 from carveracontroller.addons.probing.ProbingPopup import ProbingPopup
+from carveracontroller.addons.remote_api.service import RemoteApiService
 from carveracontroller.addons.stock.stock_defaults import (
     bounds_from_settings,
     carver_mode_from_settings,
@@ -1416,6 +1417,14 @@ class ConfigPopup(ModalView):
 
     def get_original(self, section, key):
         return self._widget_snapshot.get((section, key))
+
+    def show_value(self, section, key, value):
+        """Show a value written to Config outside the panel (e.g. a generated token) without marking a change."""
+        for widget in self._all_setting_items():
+            if widget.section == section and widget.key == key:
+                widget.value = value
+                if (section, key) in self._widget_snapshot:
+                    self._widget_snapshot[(section, key)] = value
 
     def on_dismiss(self):
         app = App.get_running_app()
@@ -2698,6 +2707,9 @@ class Makera(RelativeLayout):
     decompercent = 0  # carvera解压压缩文件的块数
     decompercentlast = 0  # carvera解压压缩文件的块数
     decompstatus = False
+    # A machine listing of this path reports errors in quiet_machine_ls_error instead of a popup (Remote API)
+    quiet_machine_ls_path = None
+    quiet_machine_ls_error = None
     decomptime = 0
 
     ctl_version = ""
@@ -2929,6 +2941,7 @@ class Makera(RelativeLayout):
         self.load_keyboard_shortcuts_config()
         self.load_gcode_viewer_config()
         self.load_pendant_config()
+        self.load_remote_api_config()
         self.shortcut_manager = ShortcutManager(self)
         self.shortcut_manager.install()
 
@@ -2972,6 +2985,13 @@ class Makera(RelativeLayout):
         # Setup pendant
         self.refresh_pendant_settings()
         self.setup_pendant()
+
+        # Setup Remote API (does nothing unless enabled in settings)
+        self.remote_api = RemoteApiService(self, self.ctl_version)
+        try:
+            self.remote_api.apply_config()
+        except Exception as e:
+            logger.error(f"Error starting Remote API: {e}")
 
         if Config.has_option("carvera", "tooltip_delay"):
             delay_value = Config.getfloat("carvera", "tooltip_delay")
@@ -3084,6 +3104,11 @@ class Makera(RelativeLayout):
             logger.error(f"Error closing pendant: {e}")
 
         try:
+            self.remote_api.stop()
+        except Exception as e:
+            logger.error(f"Error stopping Remote API: {e}")
+
+        try:
             if getattr(self, "controller", None) is not None:
                 self.controller.close_manual()
         except Exception as e:
@@ -3174,6 +3199,18 @@ class Makera(RelativeLayout):
 
         SettingPendantSelector.pendant_types_map = pendant_types_map
         self.config_popup.settings_panel.add_json_panel(tr._("Pendant"), Config, data=json.dumps(pendant_config))
+
+    def load_remote_api_config(self):
+        config_def_file = os.path.join(os.path.dirname(__file__), "addons", "remote_api", "remote_api_config.json")
+        with open(config_def_file) as file:
+            remote_api_config_definition = json.load(file)
+        remote_api_config = []
+        for setting in remote_api_config_definition:
+            if "default" in setting:
+                Config.setdefault(setting["section"], setting["key"], setting["default"])
+                setting.pop("default", None)
+            remote_api_config.append(setting)
+        self.config_popup.settings_panel.add_json_panel(tr._("Remote API"), Config, data=json.dumps(remote_api_config))
 
     def _update_macro_button_text(self):
         for macro_config_key in ["touch_macro_1", "touch_macro_2", "touch_macro_3"]:
@@ -5918,6 +5955,13 @@ class Makera(RelativeLayout):
                 report_failure = False
             else:
                 report_failure = not superseded
+            if report_failure and self.quiet_machine_ls_path is not None:
+                if machine_path_key(sent_path or "") == machine_path_key(self.quiet_machine_ls_path):
+                    report_failure = False
+                    if self.controller.loadERR:
+                        self.quiet_machine_ls_error = "error"
+                    elif timed_out:
+                        self.quiet_machine_ls_error = "timeout"
             if report_failure:
                 if self.controller.loadERR:
                     Clock.schedule_once(partial(self.loadError, tr._("Error loading dir") + " '%s'!" % (sent_path,)), 0)
@@ -8605,6 +8649,9 @@ class Makera(RelativeLayout):
         if pendant_changed:
             self.pendant.close()
             self.setup_pendant()
+
+        if any(k.startswith("remote_api_") for k in self.controller_setting_change_list):
+            self.remote_api.apply_config()
 
         self._update_macro_button_text()
 

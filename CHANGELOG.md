@@ -1,4 +1,5 @@
 [unreleased]
+- Enhancement: Optional Remote API (Settings > Remote API, off by default). A token-protected local-network HTTP API that reports machine status, the console, the machine config and SD card file listings, and can upload G-code to /sd/gcodes while the machine is idle. It cannot start jobs or move the machine.
 - Enhancement: Upload and download multiple selected files from the file browser, with one progress popup for the batch
 - Enhancement: Shift-click selects a range of files in the file browser and turns multi-select on if it was off
 - Enhancement: Add a Z1 Record Timelapse toggle on the Config and Run screen, a recording mark on the camera button, and ability to open /sd/videos in the file browser when that folder exists

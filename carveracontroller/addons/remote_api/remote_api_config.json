@@ -1,0 +1,42 @@
+[
+    {
+        "type": "bool",
+        "title": "Enable Remote API",
+        "desc": "Run a small HTTP API so other programs (scripts, dashboards, automation tools) can read machine status and the console, list files and optionally upload G-code. The API cannot start jobs, move the machine or change settings.",
+        "section": "carvera",
+        "key": "remote_api_enabled",
+        "default": "0"
+    },
+    {
+        "type": "string",
+        "title": "Listen Address",
+        "desc": "127.0.0.1 accepts connections from this computer only. 0.0.0.0 accepts connections from your local network. Do not expose it to the internet.",
+        "section": "carvera",
+        "key": "remote_api_host",
+        "default": "127.0.0.1"
+    },
+    {
+        "type": "numeric",
+        "title": "Port",
+        "desc": "TCP port the API listens on.",
+        "section": "carvera",
+        "key": "remote_api_port",
+        "default": "8780"
+    },
+    {
+        "type": "string",
+        "title": "Access Token",
+        "desc": "Clients send this as 'Authorization: Bearer <token>'. A random token is generated when the API is enabled with this field empty. Clear it and apply to generate a new one.",
+        "section": "carvera",
+        "key": "remote_api_token",
+        "default": ""
+    },
+    {
+        "type": "bool",
+        "title": "Allow G-code Uploads",
+        "desc": "Allow clients to upload files into /sd/gcodes while the machine is idle. Uploaded files are shown in the MDI log.",
+        "section": "carvera",
+        "key": "remote_api_allow_upload",
+        "default": "0"
+    }
+]
